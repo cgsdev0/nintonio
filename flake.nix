@@ -1,5 +1,5 @@
 {
-  description = "Static ARMv6 glibc cross-compilation flake for Kobo i.MX35";
+  description = "Static ARMv6 Musl cross-compilation flake for legacy Kobo (Kernel 2.6)";
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
@@ -15,25 +15,25 @@
           pkgs = import nixpkgs {
             inherit system;
             crossSystem = {
+              # 1. Must use soft-float gnueabi to prevent ABI mismatch crashes
               config = "armv6l-unknown-linux-gnueabi";
               
-              # GCC expects "armv6" here, which covers the 6TEJ instruction set
+              # 2. Match your 6TEJ processor exactly 
               gcc.arch = "armv6"; 
               gcc.fpu = "vfp"; 
-              gcc.float = "soft"; # Force soft-float ABI layout matching gnueabi
-              
-              # Align internal nixpkgs layouts with the legacy target platform
+              gcc.float = "soft"; 
+
               platform = nixpkgs.lib.systems.platforms.raspberrypi;
             };
           };
+
+          # 3. Swap Glibc out for Musl (pkgsStatic), which tolerates Linux 2.6 kernels
+          staticPkgs = pkgs.pkgsStatic;
         in {
-          default = pkgs.stdenv.mkDerivation {
-            pname = "hello-kobo-armv6-static";
+          default = staticPkgs.stdenv.mkDerivation {
+            pname = "hello-kobo-legacy-static";
             version = "1.0.0";
             src = ./.;
-
-            # Leverage the cross-compiled static glibc layer
-            buildInputs = [ pkgs.glibc.static ];
 
             buildPhase = ''
               $CC -static -O2 main.c -o hello
@@ -59,7 +59,7 @@
             };
           };
         in {
-          default = pkgs.mkShell {
+          default = pkgs.pkgsStatic.mkShell {
             inputsFrom = [ self.packages.${system}.default ];
           };
         });
