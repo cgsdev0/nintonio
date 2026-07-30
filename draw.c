@@ -35,10 +35,11 @@ static int read_full(int fd, void *p, size_t n) {
 int main() {
     int fb = open("/dev/fb0", O_RDWR);
 
-		for (int i = 1; i <= 659; i++) {
-		char * fname;
-		sprintf(fname, "%03d.bmp", i);
-    int bmp = open(fname, O_RDONLY);
+		for (int bmp_idx = 1; bmp_idx <= 659; bmp_idx++) {
+		char fname[30];
+		sprintf(fname, "%04d.bmp", bmp_idx);
+		printf("reading file: %s\n", fname);
+		int bmp = open(fname, O_RDONLY);
 		lseek(bmp, 138, SEEK_SET);
 		struct upd {                              // 24-byte header, data follows inline
 				u32 x, y, w, h;
@@ -58,7 +59,9 @@ int main() {
 		const int y0 = (FB_H - IMG_H) / 2;             /* 160 */
 
 		for (int i = 0; i < IMG_H; i++) {
-				if (read_full(bmp, row, BMPROW) < 0) return -1;
+				if (read_full(bmp, row, BMPROW) < 0) {
+				    return -1;
+				}
 
 				int y = y0 + (IMG_H - 1 - i);              /* BMP rows are bottom-up */
 				unsigned char *dst = buf->data + y * FB_W + x0;
@@ -73,7 +76,10 @@ int main() {
 		ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
 		ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
 
-		free(buf); }
-		sleep(1); close(fb);
+		free(buf);
+		close(bmp);
+		sleep(1);
+		}
+		close(fb);
 		return 0;
 }
