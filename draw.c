@@ -13,38 +13,36 @@
 #define WIDTH  600
 #define HEIGHT 800
 
-struct ioctl_command {
-    unsigned int x;
-    unsigned int y;
-    unsigned int width;
-    unsigned int height;
-    unsigned char buf[HEIGHT * WIDTH];
-};
-
+typedef char u8;
+typedef unsigned int u32;
 int main() {
-    int fd = open("/dev/fb0", O_RDWR);
-    if (fd < 0) { perror("open"); return 1; }
+    int fb = open("/dev/fb0", O_RDWR);
 
-    struct ioctl_command *cmd = malloc(sizeof(*cmd));
+struct upd {                              // 24-byte header, data follows inline
+    u32 x, y, w, h;
+    u32 mode_a, mode_b;
+    u8  data[600*800];
+} *buf = malloc(480024);                  // 0x75318 = 24 + 480000
+memset(buf->data, 0, 480000);             // 0x75300
 
-    cmd->x = 0;
-    cmd->y = 0;
-    cmd->width = 600;
-    cmd->height = 800;
-    memset(cmd->buf, 0xff, sizeof(cmd->buf));
+buf->x = 0; buf->y = 0; buf->w = 600; buf->h = 800;
+buf->mode_a = 3; buf->mode_b = 1;
+ioctl(fb, 0x4702, buf);                   // blank screen w/ the zeroed payload
+ioctl(fb, 0x4528, 0);
+ioctl(fb, 0x4529, 0);
 
-    // Simple test: fill with a mid-gray checkerboard
-    for (int y = 0; y < HEIGHT; y++) {
-        for (int x = 0; x < WIDTH; x++) {
-            cmd->buf[y * WIDTH + x] = ((x / 20 + y / 20) % 2) ? 0x00 : 0xFF;
-        }
-    }
+for (int n = 0; n != 480000; ) {              // rsb #479232 + add #768 == 480000 - n
+    int r = read(0, buf->data + n, 480000 - n);   // fd 0 == stdin
+    n += r;
+    if (r <= 0) return 0;                 // short input: bail, exit code 0
+}
 
-    if (ioctl(fd, FBIO_UPDATE, cmd) < 0) perror("update ioctl");
-    if (ioctl(fd, FBIO_WAIT1, 0) < 0) perror("wait1 ioctl");
-    if (ioctl(fd, FBIO_WAIT2, 0) < 0) perror("wait2 ioctl");
+buf->x = 0; buf->y = 0; buf->w = 600; buf->h = 800;
+buf->mode_a = 2; buf->mode_b = 2;
+ioctl(fb, 0x4539, buf);                   // the actual draw
+ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
+ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
 
-    free(cmd);
-    close(fd);
-    return 0;
+free(buf); sleep(1); close(fb);
+return 1;
 }
