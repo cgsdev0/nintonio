@@ -33,7 +33,7 @@ int main() {
     // Simple test: fill with a mid-gray checkerboard
     for (int y = 0; y < HEIGHT; y++) {
         for (int x = 0; x < WIDTH; x++) {
-            fb[y * WIDTH + x] = ((x / 20 + y / 20) % 2) ? 0x00 : 0xFF;
+                fb[y * WIDTH + x] = 0xFF;
         }
     }
 
