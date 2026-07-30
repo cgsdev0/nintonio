@@ -35,6 +35,18 @@
         let staticPkgs = (mkPkgs system).pkgsStatic;
         in {
           default = staticPkgs.stdenv.mkDerivation {
+            pname = "draw-kobo";
+            version = "1.0.0";
+            src = ./.;
+            buildPhase = ''
+              $CC -static -O2 draw.c -o draw
+            '';
+            installPhase = ''
+              mkdir -p $out/bin
+              cp draw $out/bin/
+            '';
+          };
+          hello = staticPkgs.stdenv.mkDerivation {
             pname = "hello-kobo";
             version = "1.0.0";
             src = ./.;
