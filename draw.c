@@ -6,7 +6,7 @@
 #include <sys/mman.h>
 #include <string.h>
 
-#define FBIO_UPDATE   0x4702
+#define FBIO_UPDATE   0x4539
 #define FBIO_WAIT1    0x4528
 #define FBIO_WAIT2    0x4529
 
