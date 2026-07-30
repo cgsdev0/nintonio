@@ -59,6 +59,20 @@
             '';
           };
 
+          poser = staticPkgs.stdenv.mkDerivation {
+            pname = "poser-kobo";
+            version = "1.0.0";
+            src = ./.;
+            buildPhase = ''
+              $CC -g -fPIC -rdynamic -c poser.c
+              $CC -g -shared -nostartfiles -o libposer.so poser.o -ldl
+            '';
+            installPhase = ''
+              mkdir -p $out/bin
+              cp libposer.so $out/bin/
+            '';
+          };
+
           # trivial ABI-sanity-check binary, no libc formatting/float paths at all
           trivial = staticPkgs.stdenv.mkDerivation {
             pname = "trivial-kobo";
