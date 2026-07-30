@@ -22,12 +22,8 @@ struct ioctl_command {
 };
 
 int main() {
-    // Simple test: fill with a mid-gray checkerboard
-    for (int y = 0; y < HEIGHT; y++) {
-        for (int x = 0; x < WIDTH; x++) {
-            fb[y * WIDTH + x] = ((x / 20 + y / 20) % 2) ? 0x00 : 0xFF;
-        }
-    }
+    int fd = open("/dev/fb0", O_RDWR);
+    if (fd < 0) { perror("open"); return 1; }
 
     struct ioctl_command *cmd = malloc(sizeof(*cmd));
 
@@ -36,6 +32,13 @@ int main() {
     cmd->width = 600;
     cmd->height = 800;
     memset(cmd->buf, 0xff, sizeof(cmd->buf));
+
+    // Simple test: fill with a mid-gray checkerboard
+    for (int y = 0; y < HEIGHT; y++) {
+        for (int x = 0; x < WIDTH; x++) {
+            cmd->buf[y * WIDTH + x] = ((x / 20 + y / 20) % 2) ? 0x00 : 0xFF;
+        }
+    }
 
     if (ioctl(fd, FBIO_UPDATE, cmd) < 0) perror("update ioctl");
     if (ioctl(fd, FBIO_WAIT1, 0) < 0) perror("wait1 ioctl");
