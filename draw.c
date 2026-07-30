@@ -6,19 +6,26 @@
 #include <sys/mman.h>
 #include <string.h>
 
-#define FBIO_UPDATE   0x4539
+#define FBIO_UPDATE   0x4702
 #define FBIO_WAIT1    0x4528
 #define FBIO_WAIT2    0x4529
 
-#define WIDTH  800
-#define HEIGHT 600
+#define WIDTH  600
+#define HEIGHT 800
 
-struct update_args {
-    unsigned int x;
-    unsigned int y;
-    unsigned int w;
-    unsigned int h;
-    unsigned int mode; // try 2 or 3 for full refresh
+struct mxcfb_rect {
+    unsigned int top;
+    unsigned int left;
+    unsigned int width;
+    unsigned int height;
+};
+
+struct mxcfb_update_data {
+    struct mxcfb_rect update_region;
+    unsigned int waveform_mode;
+    unsigned int update_mode;
+    unsigned int update_marker;
+    int temperature;
 };
 
 int main() {
@@ -37,7 +44,20 @@ int main() {
         }
     }
 
-    struct update_args args = {0, 0, WIDTH, HEIGHT, 2};
+    struct mxcfb_update_data args = {
+        .update_region = {
+            .top = 0,
+            .left = 0,
+            .width = 600,
+            .height = 800,
+        },
+        .waveform_mode = 3,
+        .update_mode = 1,
+        .update_marker = 0,
+        .temperature = 25,
+    };
+
+    msync(fb, fb_size, MS_SYNC);
 
     if (ioctl(fd, FBIO_UPDATE, &args) < 0) perror("update ioctl");
     if (ioctl(fd, FBIO_WAIT1, 0) < 0) perror("wait1 ioctl");
