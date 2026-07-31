@@ -44,15 +44,15 @@ int main() {
 		struct upd {                              // 24-byte header, data follows inline
 				u32 x, y, w, h;
 				u32 mode_a, mode_b;
-				u8  data[FB_W*FB_H];
+				u8  data[IMG_W*IMG_H];
 		} *buf = malloc(sizeof(struct upd));                  // 0x75318 = 24 + 480000
-		memset(buf->data, 0, FB_W*FB_H);             // 0x75300
+		memset(buf->data, 0, IMG_W*IMG_H);             // 0x75300
 
-		buf->x = 0; buf->y = 0; buf->w = FB_W; buf->h = FB_H;
-		buf->mode_a = 3; buf->mode_b = 1;
-		ioctl(fb, 0x4702, buf);                   // blank screen w/ the zeroed payload
-		ioctl(fb, 0x4528, 0);
-		ioctl(fb, 0x4529, 0);
+		buf->x = 0; buf->y = 0; buf->w = IMG_W; buf->h = IMG_H;
+		// buf->mode_a = 3; buf->mode_b = 1;
+		// ioctl(fb, 0x4702, buf);                   // blank screen w/ the zeroed payload
+		// ioctl(fb, 0x4528, 0);
+		// ioctl(fb, 0x4529, 0);
 
 		unsigned char row[BMPROW];
 		const int x0 = (FB_W - IMG_W) / 2;             /* 120 */
@@ -63,22 +63,22 @@ int main() {
 				    return -1;
 				}
 
-				int y = y0 + (IMG_H - 1 - i);              /* BMP rows are bottom-up */
-				unsigned char *dst = buf->data + y * FB_W + x0;
+				int y = (IMG_H - 1 - i);              /* BMP rows are bottom-up */
+				unsigned char *dst = buf->data + y * IMG_W;
 
 				for (int x = 0; x < IMG_W; x++)
 						dst[x] = row[x * 3 + 2];               /* +2 = red */
 		}
 
-		buf->x = 0; buf->y = 0; buf->w = FB_W; buf->h = FB_H;
+		buf->x = x0; buf->y = y0; buf->w = IMG_W; buf->h = IMG_H;
 		buf->mode_a = 2; buf->mode_b = 2;
 		ioctl(fb, 0x4539, buf);                   // the actual draw
-		ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
-		ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
+		// ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
+		// ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
 
 		free(buf);
 		close(bmp);
-		sleep(1);
+		usleep(333000);
 		}
 		close(fb);
 		return 0;
