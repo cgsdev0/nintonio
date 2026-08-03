@@ -71,14 +71,14 @@ int main() {
 		}
 
 		buf->x = x0; buf->y = y0; buf->w = IMG_W; buf->h = IMG_H;
-		buf->mode_a = 2; buf->mode_b = 2;
+		buf->mode_a = 3; buf->mode_b = 1;
 		ioctl(fb, 0x4539, buf);                   // the actual draw
 		// ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
 		// ioctl(fb, 0x4528, 0); ioctl(fb, 0x4529, 0);
 
 		free(buf);
 		close(bmp);
-		usleep(333000);
+		usleep(300000);
 		}
 		close(fb);
 		return 0;
