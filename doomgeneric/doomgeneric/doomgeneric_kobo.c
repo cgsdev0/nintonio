@@ -6,7 +6,6 @@
 #include "m_argv.h"
 #include "doomgeneric.h"
 #include "i_system.h"
-#include <sys/ioctl.h>
 
 #define FBIO_UPDATE   0x4539
 
@@ -376,7 +375,6 @@ static void checkInputDevs() {
 }
 
 void DG_Init() {
-	printf("HEY :D\n");
 	int ret;
 	struct fb_var_screeninfo info;
 	struct fb_fix_screeninfo finfo;
@@ -388,13 +386,11 @@ void DG_Init() {
 	if (fbFd < 0)
 		I_Error("Failed to open /dev/fb0: %s", strerror(errno));
 
-	printf("how are you\n");
 	// get info
 	ret = ioctl(fbFd, FBIOGET_VSCREENINFO, &info);
 	if (ret != 0)
 		I_Error("Failed to get framebuffer info: %s", strerror(errno));
 
-	printf("great\n");
 	// get other info (this can optionally fail, since we can guess the stride)
 	ret = ioctl(fbFd, FBIOGET_FSCREENINFO, &finfo);
 	if (ret != 0) {
@@ -404,11 +400,28 @@ void DG_Init() {
 	else {
 		fbStride = finfo.line_length;
 	}
-	printf("excellent\n");
+
+
 
 	fbWidth = info.xres;
 	fbHeight = info.yres;
 	fbBytesPerPixel = info.bits_per_pixel / 8;
+
+	{
+		// clear the screen
+		struct upd {
+				u32 x, y, w, h;
+				u32 mode_a, mode_b;
+				u8  data[600 * 800];
+		} *buf = malloc(sizeof(struct upd));
+		memset(buf->data, 0xFF, 800*600);
+		buf->x = 0; buf->y = 0; buf->w = 600; buf->h = 800;
+		buf->mode_a = 3; buf->mode_b = 1;
+		ioctl(fbFd, 0x4702, buf);
+		ioctl(fbFd, 0x4528, 0);
+		ioctl(fbFd, 0x4529, 0);
+		free(buf);
+	}
 
 	// to center the image on screen
 	fbOffsetX = ((fbWidth - DOOMGENERIC_RESX) / 2) * fbBytesPerPixel;
@@ -418,14 +431,12 @@ void DG_Init() {
 	// set up input
 	//
 	checkInputDevs();
-	printf("oh boy\n");
 
 	if (numInputFds == 0)
 		I_Error("Failed to find any compatible input device, see the logs above for potential problems");
 
 	// get the start time
 	gettimeofday(&startTime, NULL);
-	printf("we init'd\n");
 }
 
 void DG_DrawFrame() {
@@ -487,15 +498,12 @@ int DG_GetKey(int* pressed, unsigned char* doomKey) {
 }
 
 int main(int argc, char **argv) {
-	printf("I AM THE MAIN FUNCTION LOOK AT ME\n");
 	doomgeneric_Create(argc, argv);
-	printf("prepare to loop\n");
 
 	while (1)
 	{
 		doomgeneric_Tick();
 	}
-	printf("uh oh\n");
 
 
 	return 0;
