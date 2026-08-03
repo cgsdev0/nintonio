@@ -47,6 +47,18 @@
             '';
           };
 
+          doom = staticPkgs.stdenv.mkDerivation {
+            pname = "hello-kobo";
+            version = "1.0.0";
+            src = ./doomgeneric/doomgeneric/.;
+            buildPhase = ''
+              make -f Makefile.kobo
+            '';
+            installPhase = ''
+              mkdir -p $out/bin
+              cp doomgeneric $out/bin/
+            '';
+          };
           hello = staticPkgs.stdenv.mkDerivation {
             pname = "hello-kobo";
             version = "1.0.0";
