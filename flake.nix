@@ -46,6 +46,7 @@
               cp draw $out/bin/
             '';
           };
+
           hello = staticPkgs.stdenv.mkDerivation {
             pname = "hello-kobo";
             version = "1.0.0";
@@ -59,31 +60,16 @@
             '';
           };
 
-          poser = staticPkgs.stdenv.mkDerivation {
-            pname = "poser-kobo";
+          bad_apple = staticPkgs.stdenv.mkDerivation {
+            pname = "bad_apple-kobo";
             version = "1.0.0";
             src = ./.;
             buildPhase = ''
-              $CC -g -fPIC -rdynamic -c poser.c
-              $CC -g -shared -nostartfiles -o libposer.so poser.o -ldl
+              $CC -static -O2 bad_apple.c -o bad_apple
             '';
             installPhase = ''
               mkdir -p $out/bin
-              cp libposer.so $out/bin/
-            '';
-          };
-
-          # trivial ABI-sanity-check binary, no libc formatting/float paths at all
-          trivial = staticPkgs.stdenv.mkDerivation {
-            pname = "trivial-kobo";
-            version = "1.0.0";
-            src = ./.;
-            buildPhase = ''
-              $CC -static -O2 trivial.c -o trivial
-            '';
-            installPhase = ''
-              mkdir -p $out/bin
-              cp trivial $out/bin/
+              cp bad_apple $out/bin/
             '';
           };
         });
