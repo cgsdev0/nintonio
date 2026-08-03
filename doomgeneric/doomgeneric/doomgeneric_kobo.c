@@ -6,6 +6,20 @@
 #include "m_argv.h"
 #include "doomgeneric.h"
 #include "i_system.h"
+#include <sys/ioctl.h>
+
+#define FBIO_UPDATE   0x4539
+
+typedef char u8;
+typedef unsigned int u32;
+
+typedef struct FBIOUpdate {
+		u32 x, y, w, h;
+		u32 mode_a, mode_b;
+		u8  data[DOOMGENERIC_RESY * DOOMGENERIC_RESX];
+} FBIOUpdate;
+
+FBIOUpdate fb = {};
 
 // XXX: HACK
 // Linux's input-event-codes.h and doomkeys.h have many collisions.
@@ -73,7 +87,6 @@
 static struct timeval startTime;
 
 // framebuffer stuff
-static uint8_t *fbPtr;
 static int fbFd;
 static unsigned int fbWidth, fbHeight, fbStride, fbBytesPerPixel, fbOffsetX, fbOffsetY;
 
@@ -324,44 +337,6 @@ static void checkKeys() {
 }
 
 
-#define TEST_KEY(k) (keybits[(k)/8] & (1 << ((k)%8)))
-static int isKeyboard(const char *devPath) {
-	unsigned long evbits;
-	unsigned char keybits[KEY_MAX/8 + 1];
-	int fd = open(devPath, O_RDONLY);
-	if (fd < 0) {
-		perror("Failed to open device");
-		return 0;
-	}
-
-	evbits = 0;
-	if (ioctl(fd, EVIOCGBIT(0, sizeof(evbits)), &evbits) < 0) {
-		close(fd);
-		return 0;
-	}
-
-	/* Must support EV_KEY */
-	if (!(evbits & (1 << EV_KEY))) {
-		close(fd);
-		return 0;
-	}
-
-
-	memset(keybits, 0, sizeof(keybits));
-	if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(keybits)), keybits) < 0) {
-		close(fd);
-		return 0;
-	}
-
-	if (TEST_KEY(KEY_A) && TEST_KEY(KEY_ENTER)) {
-		close(fd);
-		return 1;  /* looks like a keyboard */
-	}
-
-	close(fd);
-	return 0;
-}
-
 static void checkInputDevs() {
 	struct dirent *dp;
 	DIR *dir;
@@ -383,10 +358,6 @@ static void checkInputDevs() {
 		sprintf(fullpath, "/dev/input/%s", dp->d_name);
 
 		printf("%s is a valid event device\n", fullpath);
-		if (!isKeyboard(fullpath)) {
-			printf("%s is not a keyboard, moving on\n", fullpath);
-			continue;
-		}
 
 		fd = open(fullpath, O_RDONLY | O_NONBLOCK);
 		if (fd < 0) {
@@ -405,6 +376,7 @@ static void checkInputDevs() {
 }
 
 void DG_Init() {
+	printf("HEY :D\n");
 	int ret;
 	struct fb_var_screeninfo info;
 	struct fb_fix_screeninfo finfo;
@@ -416,11 +388,13 @@ void DG_Init() {
 	if (fbFd < 0)
 		I_Error("Failed to open /dev/fb0: %s", strerror(errno));
 
+	printf("how are you\n");
 	// get info
 	ret = ioctl(fbFd, FBIOGET_VSCREENINFO, &info);
 	if (ret != 0)
 		I_Error("Failed to get framebuffer info: %s", strerror(errno));
 
+	printf("great\n");
 	// get other info (this can optionally fail, since we can guess the stride)
 	ret = ioctl(fbFd, FBIOGET_FSCREENINFO, &finfo);
 	if (ret != 0) {
@@ -430,6 +404,7 @@ void DG_Init() {
 	else {
 		fbStride = finfo.line_length;
 	}
+	printf("excellent\n");
 
 	fbWidth = info.xres;
 	fbHeight = info.yres;
@@ -439,38 +414,38 @@ void DG_Init() {
 	fbOffsetX = ((fbWidth - DOOMGENERIC_RESX) / 2) * fbBytesPerPixel;
 	fbOffsetY = ((fbHeight - DOOMGENERIC_RESY) / 2) * fbStride;
 
-	fbPtr = mmap(NULL, fbStride * fbHeight, PROT_READ | PROT_WRITE,
-			MAP_SHARED, fbFd, 0);
-
-	if (!fbPtr)
-		I_Error("Failed to mmap /dev/fb0: %s", strerror(errno));
-
-	// clear the screen
-	memset(fbPtr, 0, fbStride * fbHeight);
-
 	//
 	// set up input
 	//
 	checkInputDevs();
+	printf("oh boy\n");
 
 	if (numInputFds == 0)
 		I_Error("Failed to find any compatible input device, see the logs above for potential problems");
 
 	// get the start time
 	gettimeofday(&startTime, NULL);
+	printf("we init'd\n");
 }
 
 void DG_DrawFrame() {
 	// we need to do it line-by-line like this to account for the
 	// fact that the system framebuffer resolution is very likely
 	// larger than the doomgeneric render resolution.
-	// for (int line = 0; line < DOOMGENERIC_RESY; line++) {
-	// 	memcpy(
-	// 		(void *)((uintptr_t)(fbPtr) + (fbStride * line) + fbOffsetY + fbOffsetX),
-	// 			(void *)(((uintptr_t)DG_ScreenBuffer) + (DOOMGENERIC_RESX * line * fbBytesPerPixel)),
-	// 		 (fbBytesPerPixel * DOOMGENERIC_RESX)
-	// 	);
-	// }
+	for (int row = 0; row < DOOMGENERIC_RESY; row++) {
+		for (int col = 0; col < DOOMGENERIC_RESX; col++) {
+			u8 *start = ((u8*)DG_ScreenBuffer) + (((row + 1) * DOOMGENERIC_RESX - col - 1) * 4);
+			u8 b = start[0];
+			u8 g = start[1];
+			u8 r = start[2];
+			float mix = 0.2126 * (float)r + 0.7152 * (float)g + 0.0722 * (float)b;
+			fb.data[col * DOOMGENERIC_RESY + row]=(u8)mix;
+		}
+	}
+
+	fb.x = 0; fb.y = 0; fb.w = DOOMGENERIC_RESY; fb.h = DOOMGENERIC_RESX;
+	fb.mode_a = 2; fb.mode_b = 2;
+	ioctl(fbFd, 0x4539, &fb);
 
 	checkKeys();
 }
@@ -512,12 +487,15 @@ int DG_GetKey(int* pressed, unsigned char* doomKey) {
 }
 
 int main(int argc, char **argv) {
+	printf("I AM THE MAIN FUNCTION LOOK AT ME\n");
 	doomgeneric_Create(argc, argv);
+	printf("prepare to loop\n");
 
 	while (1)
 	{
 		doomgeneric_Tick();
 	}
+	printf("uh oh\n");
 
 
 	return 0;

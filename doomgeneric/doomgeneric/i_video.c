@@ -467,7 +467,7 @@ void I_EndRead (void)
 
 void I_SetWindowTitle (char *title)
 {
-	DG_SetWindowTitle(title);
+	// DG_SetWindowTitle(title);
 }
 
 void I_GraphicsCheckCommandLine (void)
