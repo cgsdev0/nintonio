@@ -20,6 +20,9 @@ typedef struct FBIOUpdate {
 
 FBIOUpdate fb = {};
 
+int amode = 2;
+int bmode = 2;
+
 // XXX: HACK
 // Linux's input-event-codes.h and doomkeys.h have many collisions.
 // Redefine some of doomkeys.h's names here to work around this.
@@ -58,6 +61,7 @@ FBIOUpdate fb = {};
 #define DOOM_KEY_F12		(0x80+0x58)
 
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -134,6 +138,9 @@ static char evdevShiftKeysToASCII4[11] = {
 static unsigned char convertToDoomKey(unsigned int key){
 	switch (key) {
 		case KEY_ENTER:
+			key = KEY_FIRE;
+			break;
+		case 0x3e:
 			key = DOOM_KEY_ENTER;
 			break;
 		case KEY_ESC:
@@ -155,7 +162,7 @@ static unsigned char convertToDoomKey(unsigned int key){
 		case KEY_RIGHTCTRL:
 			key = KEY_FIRE;
 			break;
-		case KEY_SPACE:
+		case KEY_F3:
 			key = KEY_USE;
 			break;
 		case KEY_LEFTSHIFT:
@@ -169,12 +176,12 @@ static unsigned char convertToDoomKey(unsigned int key){
 		case KEY_F2:
 			key = DOOM_KEY_F2;
 			break;
-		case KEY_F3:
-			key = DOOM_KEY_F3;
-			break;
-		case KEY_F4:
-			key = DOOM_KEY_F4;
-			break;
+		// case KEY_F3:
+		// 	key = DOOM_KEY_F3;
+		// 	break;
+		// case KEY_F4:
+		// 	key = DOOM_KEY_F4;
+		// 	break;
 		case KEY_F5:
 			key = DOOM_KEY_F5;
 			break;
@@ -439,6 +446,10 @@ void DG_Init() {
 	gettimeofday(&startTime, NULL);
 }
 
+float max(float a, float b) {
+	return a > b ? a : b;
+}
+
 void DG_DrawFrame() {
 	// we need to do it line-by-line like this to account for the
 	// fact that the system framebuffer resolution is very likely
@@ -449,13 +460,18 @@ void DG_DrawFrame() {
 			u8 b = start[0];
 			u8 g = start[1];
 			u8 r = start[2];
-			float mix = 0.2126 * (float)r + 0.7152 * (float)g + 0.0722 * (float)b;
+			float fr = (float)r;
+			float fg = (float)g;
+			float fblue = (float)b;
+			// float mix = 0.2126 * fr + 0.7152 * fg + 0.0722 * fblue;
+			float mix = max(fr, fg);
+			mix = max(mix, fblue);
 			fb.data[col * DOOMGENERIC_RESY + row]=(u8)mix;
 		}
 	}
 
 	fb.x = 0; fb.y = 0; fb.w = DOOMGENERIC_RESY; fb.h = DOOMGENERIC_RESX;
-	fb.mode_a = 2; fb.mode_b = 2;
+	fb.mode_a = amode; fb.mode_b = bmode;
 	ioctl(fbFd, 0x4539, &fb);
 
 	checkKeys();
@@ -498,6 +514,13 @@ int DG_GetKey(int* pressed, unsigned char* doomKey) {
 }
 
 int main(int argc, char **argv) {
+	char *amode_p = getenv("AMODE");
+	char *bmode_p = getenv("BMODE");
+	if (amode_p != NULL)
+			amode = atoi(amode_p);
+	if (bmode_p != NULL)
+			bmode = atoi(bmode_p);
+
 	doomgeneric_Create(argc, argv);
 
 	while (1)

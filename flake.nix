@@ -30,9 +30,37 @@
           };
         };
       };
+
     in {
       packages = forAllSystems (system:
         let staticPkgs = (mkPkgs system).pkgsStatic;
+        gpsp-core = staticPkgs.stdenv.mkDerivation {
+          pname = "gpsp-core";
+          version = "1.1.0";
+          src = ./gpSP/.;
+
+          dontConfigure = true;
+          enableParallelBuilding = true;
+
+          # 128MB device: default is 10MB ROM JIT + 32MB ROM buffer.
+          # -marm is belt-and-braces; the dynarec stub is ARM-mode.
+          NIX_CFLAGS_COMPILE = "-marm -DSMALL_TRANSLATION_CACHE -DROM_BUFFER_SIZE=16";
+
+          makeFlags = [
+            "platform=unix"
+            "CPU_ARCH=arm"
+            "HAVE_DYNAREC=1"
+            "MMAP_JIT_CACHE=1"
+            "STATIC_LINKING=1"
+            "TARGET=libgpsp.a"
+          ];
+
+          installPhase = ''
+            mkdir -p $out/lib $out/include
+            cp libgpsp.a $out/lib/
+            cp libretro/libretro-common/include/libretro.h $out/include/
+          '';
+        };
         in {
           default = staticPkgs.stdenv.mkDerivation {
             pname = "draw-kobo";
@@ -47,6 +75,24 @@
             '';
           };
 
+
+          gb = staticPkgs.stdenv.mkDerivation {
+            pname = "gpsp-kobo";
+            version = "1.0.0";
+            src = ./.;
+
+            buildPhase = ''
+              pwd && $CC -static -O2 \
+                -I${gpsp-core}/include \
+                gpsp_kobo.c ${gpsp-core}/lib/libgpsp.a \
+                -lm -o gpsp-kobo
+            '';
+
+            installPhase = ''
+              mkdir -p $out/bin
+              cp gpsp-kobo $out/bin/
+            '';
+          };
           doom = staticPkgs.stdenv.mkDerivation {
             pname = "hello-kobo";
             version = "1.0.0";

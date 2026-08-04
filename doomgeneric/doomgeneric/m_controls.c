@@ -29,18 +29,18 @@
 int key_right = KEY_RIGHTARROW;
 int key_left = KEY_LEFTARROW;
 int key_up = KEY_UPARROW;
-int key_down = KEY_DOWNARROW; 
+int key_down = KEY_DOWNARROW;
 int key_strafeleft = KEY_STRAFE_L;
 int key_straferight = KEY_STRAFE_R;
 int key_fire = KEY_FIRE;
 int key_use = KEY_USE;
 int key_strafe = KEY_RALT;
-int key_speed = KEY_RSHIFT; 
+int key_speed = KEY_RSHIFT;
 
-// 
+//
 // Heretic keyboard controls
 //
- 
+
 int key_flyup = KEY_PGUP;
 int key_flydown = KEY_INS;
 int key_flycenter = KEY_HOME;
@@ -128,7 +128,7 @@ int key_weapon6 = '6';
 int key_weapon7 = '7';
 int key_weapon8 = '8';
 int key_prevweapon = 0;
-int key_nextweapon = 0;
+int key_nextweapon = KEY_F2;
 
 // Map control keys:
 
@@ -157,17 +157,17 @@ int key_menu_forward   = KEY_ENTER;
 int key_menu_confirm   = 'y';
 int key_menu_abort     = 'n';
 
-int key_menu_help      = KEY_F1;
-int key_menu_save      = KEY_F2;
-int key_menu_load      = KEY_F3;
-int key_menu_volume    = KEY_F4;
-int key_menu_detail    = KEY_F5;
-int key_menu_qsave     = KEY_F6;
-int key_menu_endgame   = KEY_F7;
-int key_menu_messages  = KEY_F8;
-int key_menu_qload     = KEY_F9;
-int key_menu_quit      = KEY_F10;
-int key_menu_gamma     = KEY_F11;
+int key_menu_help      = 0;
+int key_menu_save      = 0;
+int key_menu_load      = 0;
+int key_menu_volume    = 0;
+int key_menu_detail    = 0;
+int key_menu_qsave     = 0;
+int key_menu_endgame   = 0;
+int key_menu_messages  = 0;
+int key_menu_qload     = 0;
+int key_menu_quit      = 0;
+int key_menu_gamma     = 0;
 
 int key_menu_incscreen = KEY_EQUALS;
 int key_menu_decscreen = KEY_MINUS;
@@ -192,12 +192,12 @@ int joybnextweapon = -1;
 
 int joybmenu = -1;
 
-// Control whether if a mouse button is double clicked, it acts like 
+// Control whether if a mouse button is double clicked, it acts like
 // "use" has been pressed
 
 int dclick_use = 1;
- 
-// 
+
+//
 // Bind all of the common controls used by Doom and all other games.
 //
 
@@ -395,4 +395,3 @@ void M_ApplyPlatformDefaults(void)
 {
     // no-op. Add your platform-specific patches here.
 }
-
