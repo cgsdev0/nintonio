@@ -1,6 +1,7 @@
 /* gpsp_kobo.c -- minimal libretro frontend driving gpSP directly.
  * No dlopen: we link libgpsp.a and call retro_* as ordinary functions. */
 
+#include <time.h>
 #include <unistd.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -23,6 +24,11 @@ static char sysdir[] = ".";
 
 static int fbFd;
 
+static time_t dirty_at = 0;
+extern uint32_t backup_dirty;
+static bool   pending  = false;
+static bool   first_save  = false;
+
 typedef char u8;
 typedef unsigned short u16;
 typedef unsigned int u32;
@@ -44,16 +50,24 @@ int bmode = 2;
 #define FRAME_POLL 15
 static int frame_idx = 0;
 
+static uint8_t shadow[0x20000];
+static bool sram_changed(void) {
+   void *mem = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+   if (!memcmp(shadow, mem, 0x20000)) return false;
+   memcpy(shadow, mem, 0x20000);
+   return true;
+}
+
 /* Fill in from the dump above. Left column = kernel KEY_* code. */
 static const struct { uint16_t code; uint8_t id; } keymap[] = {
-   { KEY_UP,     RETRO_DEVICE_ID_JOYPAD_UP    },
-   { KEY_RIGHT,  RETRO_DEVICE_ID_JOYPAD_RIGHT },
-   { KEY_DOWN,   RETRO_DEVICE_ID_JOYPAD_DOWN  },
-   { KEY_LEFT,   RETRO_DEVICE_ID_JOYPAD_LEFT  },
-   { KEY_ENTER,  RETRO_DEVICE_ID_JOYPAD_A     },
-   { KEY_F1,   RETRO_DEVICE_ID_JOYPAD_B       },
-   { KEY_F2,   RETRO_DEVICE_ID_JOYPAD_START   },
-   { KEY_F3,   RETRO_DEVICE_ID_JOYPAD_SELECT  },
+   { KEY_RIGHT,  RETRO_DEVICE_ID_JOYPAD_UP    },
+   { KEY_F8,   RETRO_DEVICE_ID_JOYPAD_RIGHT },
+   { KEY_F7,   RETRO_DEVICE_ID_JOYPAD_DOWN  },
+   { KEY_F1,   RETRO_DEVICE_ID_JOYPAD_LEFT    },
+   { KEY_ENTER,   RETRO_DEVICE_ID_JOYPAD_A       },
+   { KEY_F4,   RETRO_DEVICE_ID_JOYPAD_B       },
+   { KEY_F3,   RETRO_DEVICE_ID_JOYPAD_START   },
+   { KEY_F2,   RETRO_DEVICE_ID_JOYPAD_SELECT  },
 };
 
 int input_open(const char *path)
@@ -63,6 +77,45 @@ int input_open(const char *path)
    // stop keys reaching the console/Nickel
    ioctl(kbd_fd, EVIOCGRAB, 1);
    return 0;
+}
+
+static void save_sram(const char *path)
+{
+   void  *mem  = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+   size_t size = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
+   char tmp[512];
+   FILE *f;
+
+   if (!mem || !size) return;
+
+   if (!first_save) {
+      first_save = true;
+      return;
+   }
+   printf("we are saving\n");
+
+   /* write-then-rename: a half-written .srm loses the save */
+   snprintf(tmp, sizeof tmp, "%s.tmp", path);
+   if (!(f = fopen(tmp, "wb"))) return;
+   if (fwrite(mem, 1, size, f) == size) {
+      fflush(f);
+      fsync(fileno(f));
+      fclose(f);
+      rename(tmp, path);
+   } else {
+      fclose(f);
+      remove(tmp);
+   }
+}
+
+static void load_sram(const char *path)   /* call AFTER retro_load_game */
+{
+   void  *mem  = retro_get_memory_data(RETRO_MEMORY_SAVE_RAM);
+   size_t size = retro_get_memory_size(RETRO_MEMORY_SAVE_RAM);
+   FILE *f = fopen(path, "rb");
+   if (!f) return;
+   fread(mem, 1, size, f);
+   fclose(f);
 }
 
 void input_close(void)
@@ -106,7 +159,7 @@ static void cb_video(const void *data, unsigned w, unsigned h, size_t pitch)
 
      for (int row = 0; row < RESY; row++) {
        for (int col = 0; col < RESX; col++) {
-         u8 *start = ((u8*)data) + (((row + 1) * RESX - col - 1) * 2);
+         u8 *start = ((u8*)data) + (((RESY - row - 1) * RESX + col) * 2);
          u16 color = *((u16*)start);
          u8 r5 = (color >> 11) & 0x1F;
          u8 g6 = (color >>  5) & 0x3F;
@@ -187,12 +240,30 @@ static bool cb_environment(unsigned cmd, void *data)
    }
 }
 
+/* Writes "<stem>.srm" into out. Returns 0 on success, -1 if it wouldn't fit. */
+static int make_srm_path(char *out, size_t outsz, const char *rom)
+{
+   const char *slash = strrchr(rom, '/');
+   const char *base  = slash ? slash + 1 : rom;      /* only look in the basename */
+   const char *dot   = strrchr(base, '.');
+   size_t stem = dot ? (size_t)(dot - rom) : strlen(rom);
+
+   if (stem + 5 > outsz) return -1;                   /* ".srm" + NUL */
+   memcpy(out, rom, stem);
+   memcpy(out + stem, ".srm", 5);
+   return 0;
+}
+
 int main(int argc, char **argv)
 {
    struct retro_game_info game;
    struct retro_system_av_info av;
+   char srm_path[128];
 
    if (argc < 2) { fprintf(stderr, "usage: %s rom.gba\n", argv[0]); return 1; }
+
+   make_srm_path(srm_path, 128, argv[1]);
+
 
    fb_init();
    input_open("/dev/input/event0");
@@ -215,12 +286,24 @@ int main(int argc, char **argv)
       return 1;
    }
 
+   load_sram(srm_path);
+
    retro_get_system_av_info(&av);
    fprintf(stderr, "%ux%u @ %.2f fps\n",
            av.geometry.base_width, av.geometry.base_height, av.timing.fps);
 
-   for (;;)
+   for (;;) {
       retro_run();
+      if (backup_dirty) {
+         backup_dirty = 0;
+         dirty_at = time(NULL);
+         pending  = true;
+      }
+      if (pending && time(NULL) - dirty_at >= 2) {
+         if (sram_changed()) save_sram(srm_path);
+         pending = false;
+      }
+   }
 
    retro_unload_game();
    retro_deinit();

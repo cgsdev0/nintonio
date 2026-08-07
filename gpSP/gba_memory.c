@@ -358,6 +358,7 @@ u8 bios_rom[1024 * 16];
 
 // Up to 128kb, store SRAM, flash ROM, or EEPROM here.
 u8 gamepak_backup[1024 * 128];
+u32 backup_dirty = 0;
 
 u32 dma_bus_val;
 dma_transfer_type dma[4];
@@ -522,6 +523,7 @@ u32 eeprom_counter = 0;
 
 void function_cc write_eeprom(u32 unused_address, u32 value)
 {
+  backup_dirty = 1;
   switch(eeprom_mode)
   {
     case EEPROM_BASE_MODE:
@@ -1077,6 +1079,7 @@ cpu_alert_type function_cc write_io_register32(u32 address, u32 value)
 
 void function_cc write_backup(u32 address, u32 value)
 {
+  backup_dirty = 1;
   value &= 0xFF;
 
   if(backup_type == BACKUP_EEPROM)
