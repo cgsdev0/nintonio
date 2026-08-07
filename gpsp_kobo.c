@@ -101,8 +101,11 @@ static void save_sram(const char *path)
       fflush(f);
       fsync(fileno(f));
       fclose(f);
-      rename(tmp, path);
+      if(rename(tmp, path) != 0) {
+         printf("Rename failed!\n");
+      }
    } else {
+      printf("Write failed!\n");
       fclose(f);
       remove(tmp);
    }
@@ -240,30 +243,14 @@ static bool cb_environment(unsigned cmd, void *data)
    }
 }
 
-/* Writes "<stem>.srm" into out. Returns 0 on success, -1 if it wouldn't fit. */
-static int make_srm_path(char *out, size_t outsz, const char *rom)
-{
-   const char *slash = strrchr(rom, '/');
-   const char *base  = slash ? slash + 1 : rom;      /* only look in the basename */
-   const char *dot   = strrchr(base, '.');
-   size_t stem = dot ? (size_t)(dot - rom) : strlen(rom);
-
-   if (stem + 5 > outsz) return -1;                   /* ".srm" + NUL */
-   memcpy(out, rom, stem);
-   memcpy(out + stem, ".srm", 5);
-   return 0;
-}
-
 int main(int argc, char **argv)
 {
    struct retro_game_info game;
    struct retro_system_av_info av;
-   char srm_path[128];
 
-   if (argc < 2) { fprintf(stderr, "usage: %s rom.gba\n", argv[0]); return 1; }
+   if (argc < 3) { fprintf(stderr, "usage: %s rom.gba save.srm\n", argv[0]); return 1; }
 
-   make_srm_path(srm_path, 128, argv[1]);
-
+   printf("SRAM path: %s\n", argv[2]);
 
    fb_init();
    input_open("/dev/input/event0");
@@ -286,7 +273,8 @@ int main(int argc, char **argv)
       return 1;
    }
 
-   load_sram(srm_path);
+   printf("loading SRAM from disk\n");
+   load_sram(argv[2]);
 
    retro_get_system_av_info(&av);
    fprintf(stderr, "%ux%u @ %.2f fps\n",
@@ -300,7 +288,7 @@ int main(int argc, char **argv)
          pending  = true;
       }
       if (pending && time(NULL) - dirty_at >= 2) {
-         if (sram_changed()) save_sram(srm_path);
+         if (sram_changed()) save_sram(argv[2]);
          pending = false;
       }
    }
